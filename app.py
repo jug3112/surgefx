@@ -23,6 +23,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Check for admin mode
+def check_admin_mode():
+    query_params = st.experimental_get_query_params()
+    return "admin" in query_params and query_params["admin"][0] == "true"
+
+# If in admin mode, show admin panel
+if check_admin_mode():
+    try:
+        import admin
+        admin.admin_panel()
+        st.stop()  # Stop execution of the rest of the app
+    except ImportError:
+        st.error("Admin module not found. Please add admin.py to your repository.")
+        if st.button("Continue to Main App"):
+            st.experimental_set_query_params()
+            st.rerun()
+    except Exception as e:
+        st.error(f"Error loading admin panel: {e}")
+        if st.button("Continue to Main App"):
+            st.experimental_set_query_params()
+            st.rerun()
+
 # Add this function to your app.py file near the beginning
 
 def ensure_database_exists():
