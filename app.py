@@ -21,6 +21,10 @@ try:
     from transactions_analysis import show_transactions_tab
 except ImportError:
     show_transactions_tab = None
+try:
+    import generate_transactions_page
+except ImportError:
+    generate_transactions_page = None
 
 # Set page configuration
 st.set_page_config(
@@ -722,6 +726,14 @@ def main():
                 show_transactions_tab()
             else:
                 st.error("Transaction analysis module not found")
+
+# Add generator link in sidebar
+if st.sidebar.checkbox("Show Transaction Generator"):
+    if generate_transactions_page:
+        import generate_transactions_page
+        st.stop()  # Stop the main app
+    else:
+        st.sidebar.error("Transaction generator not found")
 
 if __name__ == "__main__":
     main()
