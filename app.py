@@ -17,6 +17,82 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add this function to your app.py file near the beginning
+
+def ensure_database_exists():
+    """Ensure the database exists, creating it if necessary"""
+    if not os.path.exists("offers_database.db"):
+        st.info("Database not found. Generating dummy database...")
+        
+        # Import functions from the generator script
+        try:
+            # Option 1: Import directly from the file
+            from generate_dummy_data import generate_dummy_data, create_database
+            
+            # Generate and save data
+            with st.spinner("Generating 10,000 dummy offers..."):
+                df = generate_dummy_data()
+                create_database(df)
+                st.success("Database created successfully!")
+        except ImportError:
+            # Option 2: Generate data inline if import fails
+            st.warning("Could not import from generate_dummy_data.py. Generating data inline...")
+            
+            # Define a simplified version of the data generator
+            def quick_generate_dummy_data():
+                """Generate a smaller set of dummy data"""
+                import pandas as pd
+                import random
+                import datetime
+                import uuid
+                
+                data = []
+                merchants = [
+                    "Amazon", "Flipkart", "Swiggy", "Zomato", "BigBasket", 
+                    "MakeMyTrip", "BookMyShow", "Myntra", "Ajio", "Nykaa"
+                ]
+                categories = ["Shopping", "Food", "Travel", "Fashion", "Grocery"]
+                offer_types = ["discount", "cashback", "buy_one_get_one", "free_delivery"]
+                
+                # Generate 1,000 offers for quick testing
+                for _ in range(1000):
+                    merchant = random.choice(merchants)
+                    category = random.choice(categories)
+                    offer_type = random.choice(offer_types)
+                    
+                    offer = {
+                        "offer_id": f"{merchant[:3].upper()}{str(uuid.uuid4())[:8].upper()}",
+                        "merchant": merchant,
+                        "category": category,
+                        "type": offer_type,
+                        "discount_percent": random.choice([10, 15, 20, 25, 30, 40, 50]) if random.random() < 0.7 else None,
+                        "discount_value": random.choice([50, 100, 150, 200, 300]) if random.random() < 0.3 else None,
+                        "minimum_purchase": random.choice([499, 999, 1499, 1999]) if random.random() < 0.6 else None,
+                        "coupon_code": f"SAVE{random.choice([10, 20, 30])}" if random.random() < 0.7 else None,
+                        "description": f"Special offer at {merchant}",
+                        "terms_conditions": "Terms and conditions apply",
+                        "valid_from": (datetime.datetime.now() - datetime.timedelta(days=random.randint(0, 30))).date(),
+                        "valid_until": (datetime.datetime.now() + datetime.timedelta(days=random.randint(15, 90))).date(),
+                        "affiliate_link": f"https://{merchant.lower().replace(' ', '-')}.affiliate.com/offers/{random.randint(1000, 9999)}"
+                    }
+                    data.append(offer)
+                
+                return pd.DataFrame(data)
+            
+            # Create database with simplified data
+            conn = sqlite3.connect("offers_database.db")
+            df = quick_generate_dummy_data()
+            df.to_sql('offers', conn, if_exists='replace', index=False)
+            
+            # Create indices
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_merchant ON offers (merchant)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_category ON offers (category)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_type ON offers (type)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_valid_dates ON offers (valid_from, valid_until)')
+            
+            conn.close()
+            st.success("Database created with 1,000 sample offers!")
+
 # Database connection helper
 def get_db_connection(db_path="offers_database.db"):
     """Create a database connection"""
