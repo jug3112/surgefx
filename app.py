@@ -25,7 +25,7 @@ st.set_page_config(
 
 # Check for admin mode
 def check_admin_mode():
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()
     return "admin" in query_params and query_params["admin"][0] == "true"
 
 # If in admin mode, show admin panel
