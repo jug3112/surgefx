@@ -55,7 +55,7 @@ def ensure_customer_database():
                 try:
                     generate_customer_data()
                     st.success("Customer database generated successfully!")
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error generating customer database: {e}")
             return False
