@@ -9,15 +9,45 @@ from datetime import datetime
 # Customer database path
 CUSTOMERS_DB_PATH = 'data/customer_database.db'
 
-# Function to ensure customer database exists
-def ensure_customer_database():
-    """Creates the customer database if it doesn't exist"""
+# Function to initialize customer database
+def initialize_customer_database():
+    """Creates the customer database and table structure"""
     # Ensure data directory exists
     os.makedirs('data', exist_ok=True)
     
-    # Check if database exists
-    if not os.path.exists(CUSTOMERS_DB_PATH):
-        st.warning("Customer database not found.")
+    # Create/connect to the database
+    conn = sqlite3.connect(CUSTOMERS_DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create the customers table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS customers (
+        customer_id TEXT PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        mobile_number TEXT NOT NULL,
+        email TEXT NOT NULL,
+        mobile_type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    conn.commit()
+    
+    # Check if table is empty
+    cursor.execute("SELECT COUNT(*) FROM customers")
+    count = cursor.fetchone()[0]
+    
+    conn.close()
+    return count
+
+# Function to ensure customer database exists and contains data
+def ensure_customer_database():
+    """Ensures customer database exists and has data"""
+    # First create the database and table if they don't exist
+    record_count = initialize_customer_database()
+    
+    # If no records, show the generate button
+    if record_count == 0:
+        st.warning("Customer database is empty.")
         st.info("Click the button below to generate a database with 1000 sample customers.")
         
         if st.button("Generate Customer Database"):
@@ -34,22 +64,12 @@ def ensure_customer_database():
 # Function to generate customer data
 def generate_customer_data():
     """Generates 1000 sample customer records"""
+    # Initialize the database to ensure table exists
+    initialize_customer_database()
+    
     # Connection to the database
     conn = sqlite3.connect(CUSTOMERS_DB_PATH)
     cursor = conn.cursor()
-
-    # Create the customers table if it doesn't exist
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS customers (
-        customer_id TEXT PRIMARY KEY,
-        customer_name TEXT NOT NULL,
-        mobile_number TEXT NOT NULL,
-        email TEXT NOT NULL,
-        mobile_type TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    conn.commit()
 
     # Lists for generating realistic customer data
     first_names = [
@@ -79,7 +99,7 @@ def generate_customer_data():
     email_domains = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", 
                     "aol.com", "protonmail.com", "mail.com", "zoho.com", "yandex.com"]
 
-    mobile_types = ["iOS", "Android"]
+    mobile_types = ["iOS", "Android"]  # Including only iOS and Android as specified
     mobile_type_weights = [0.45, 0.55]  # 45% iOS, 55% Android
 
     # Generate 1000 customer records
@@ -123,30 +143,40 @@ def generate_customer_data():
 @st.cache_data(ttl=300)
 def load_customers_data(_conn, filters=None):
     """Loads customer data with optional filters"""
-    query = "SELECT * FROM customers"
-    params = []
-    
-    if filters:
-        conditions = []
+    try:
+        query = "SELECT * FROM customers"
+        params = []
         
-        if filters.get('customer_name'):
-            conditions.append("customer_name LIKE ?")
-            params.append(f"%{filters['customer_name']}%")
+        if filters:
+            conditions = []
+            
+            if filters.get('customer_name'):
+                conditions.append("customer_name LIKE ?")
+                params.append(f"%{filters['customer_name']}%")
+            
+            if filters.get('mobile_type'):
+                conditions.append("mobile_type = ?")
+                params.append(filters['mobile_type'])
+            
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
         
-        if filters.get('mobile_type'):
-            conditions.append("mobile_type = ?")
-            params.append(filters['mobile_type'])
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-    
-    return pd.read_sql_query(query, _conn)
+        return pd.read_sql_query(query, _conn)
+    except Exception as e:
+        st.error(f"Error loading customer data: {e}")
+        return pd.DataFrame()
 
 # Function to get filter options for customers
 @st.cache_data(ttl=300)
 def get_customers_filter_options(_conn):
     """Gets available filter options for customers"""
     try:
+        # First check if the table exists
+        cursor = _conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='customers'")
+        if not cursor.fetchone():
+            return {'mobile_types': []}
+            
         mobile_types = pd.read_sql_query("SELECT DISTINCT mobile_type FROM customers ORDER BY mobile_type", _conn)['mobile_type'].tolist()
         return {
             'mobile_types': mobile_types
@@ -162,10 +192,15 @@ def add_real_customer(conn, customer_name, mobile_number, email, mobile_type):
     
     # Generate a new customer_id based on current max ID
     cursor.execute("SELECT MAX(SUBSTR(customer_id, 5)) FROM customers")
-    max_id = cursor.fetchone()[0]
-    if max_id is None:
+    max_id_result = cursor.fetchone()[0]
+    
+    # Handle case where there are no customers yet
+    if max_id_result is None:
         max_id = 0
-    new_id = int(max_id) + 1
+    else:
+        max_id = int(max_id_result)
+    
+    new_id = max_id + 1
     customer_id = f"CUST{new_id:06d}"
     
     # Insert the new customer
@@ -180,7 +215,10 @@ def show_customers_tab():
     """Displays the customers tab content"""
     st.header("Customer Database")
     
-    # Ensure customer database exists
+    # Initialize the database
+    initialize_customer_database()
+    
+    # Ensure customer database has data
     if not ensure_customer_database():
         return
     
@@ -203,7 +241,12 @@ def show_customers_tab():
         
         # Create filters
         customer_name_filter = st.text_input("Search by Name")
-        selected_mobile_type = st.selectbox("Mobile Type", ["All"] + customer_filter_options["mobile_types"])
+        
+        # Only show mobile type filter if we have options
+        if customer_filter_options["mobile_types"]:
+            selected_mobile_type = st.selectbox("Mobile Type", ["All"] + customer_filter_options["mobile_types"])
+        else:
+            selected_mobile_type = "All"
         
         # Apply filters
         customer_filters = {}
@@ -238,11 +281,6 @@ def show_customers_tab():
         with col3:
             android_users = len(customers_df[customers_df["mobile_type"] == "Android"])
             st.metric("Android Users", f"{android_users:,}")
-        
-        # Distribution chart
-        mobile_dist = customers_df.groupby("mobile_type").size().reset_index(name="count")
-        st.subheader("Mobile Type Distribution")
-        st.bar_chart(mobile_dist.set_index("mobile_type"))
         
         # Display customer table
         st.subheader("Customer Data")
