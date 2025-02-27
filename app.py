@@ -100,9 +100,8 @@ def get_db_connection(db_path="offers_database.db"):
     conn.row_factory = sqlite3.Row  # This enables column access by name
     return conn
 
-# Data loading functions
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_data(conn, filters=None):
+def load_data(_conn, filters=None):
     """Load data from database with optional filters"""
     query = "SELECT * FROM offers"
     params = []
@@ -139,15 +138,15 @@ def load_data(conn, filters=None):
             query += " WHERE " + " AND ".join(conditions)
     
     # Execute query
-    df = pd.read_sql_query(query, conn, params=params)
+    df = pd.read_sql_query(query, _conn, params=params)
     return df
 
 @st.cache_data
-def get_filter_options(conn):
+def get_filter_options(_conn):
     """Get unique values for filters"""
-    merchants = pd.read_sql_query("SELECT DISTINCT merchant FROM offers ORDER BY merchant", conn)['merchant'].tolist()
-    categories = pd.read_sql_query("SELECT DISTINCT category FROM offers ORDER BY category", conn)['category'].tolist()
-    offer_types = pd.read_sql_query("SELECT DISTINCT type FROM offers ORDER BY type", conn)['type'].tolist()
+    merchants = pd.read_sql_query("SELECT DISTINCT merchant FROM offers ORDER BY merchant", _conn)['merchant'].tolist()
+    categories = pd.read_sql_query("SELECT DISTINCT category FROM offers ORDER BY category", _conn)['category'].tolist()
+    offer_types = pd.read_sql_query("SELECT DISTINCT type FROM offers ORDER BY type", _conn)['type'].tolist()
     
     return {
         'merchants': ['All'] + merchants,
