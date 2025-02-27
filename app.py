@@ -377,6 +377,8 @@ def save_api_data_to_db(offers, db_path="offers_database.db"):
 
 # Main Application
 def main():
+    # Ensure database exists
+    ensure_database_exists()
     # App title with company logo/icon
     st.title("🏷️ Merchant Offers Dashboard")
     st.markdown("### Real-time Database for Merchant Offers & Promotions")
