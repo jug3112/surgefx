@@ -195,4 +195,152 @@ def show_transactions_tab():
                 
                 # Key metrics
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Total
+                col1.metric("Total Spend", f"${behavior['total_spend']:.2f}")
+                col2.metric("Transactions", str(behavior['transaction_count']))
+                col3.metric("Avg Transaction", f"${behavior['avg_transaction']:.2f}")
+                
+                # Category preferences
+                st.subheader("Spending by Category")
+                
+                if not behavior['top_categories'].empty:
+                    st.bar_chart(
+                        behavior['top_categories'].set_index('category_name')['transaction_amount']
+                    )
+                    
+                    st.write("**Primary Interests:**")
+                    primary_interests = behavior['top_categories'][behavior['top_categories']['spend_percentage'] >= 15]
+                    if not primary_interests.empty:
+                        for i, row in primary_interests.iterrows():
+                            st.write(f"- {row['category_name']} ({row['spend_percentage']:.1f}%)")
+                    else:
+                        st.write("- No strong primary interests identified")
+                else:
+                    st.write("No category data available")
+                
+                # Merchant preferences
+                st.subheader("Top Merchants")
+                
+                if not behavior['top_merchants'].empty:
+                    st.dataframe(
+                        behavior['top_merchants'][['merchant_name', 'transaction_amount', 'transaction_id']].head(10).rename(
+                            columns={'transaction_amount': 'Total Spend', 'transaction_id': 'Visit Count'}
+                        )
+                    )
+                    
+                    st.write("**Favorite Merchants:**")
+                    favorite_merchants = behavior['top_merchants'][
+                        (behavior['top_merchants']['transaction_id'] >= 3) | 
+                        (behavior['top_merchants']['spend_percentage'] >= 10)
+                    ]
+                    
+                    if not favorite_merchants.empty:
+                        for i, row in favorite_merchants.head(5).iterrows():
+                            st.write(f"- {row['merchant_name']} ({row['transaction_id']} visits)")
+                    else:
+                        st.write("- No clear favorite merchants identified")
+                else:
+                    st.write("No merchant data available")
+                
+                # Recommended Offers
+                st.subheader("Offer Targeting Recommendations")
+                
+                # Based on top categories
+                st.write("**Recommended Offer Types:**")
+                
+                recommendations = []
+                
+                for i, row in behavior['top_categories'].head(3).iterrows():
+                    category = row['category_name']
+                    if 'Grocery' in category:
+                        recommendations.append("Cashback offers for grocery stores")
+                    elif 'Gas' in category:
+                        recommendations.append("Fuel discounts or loyalty programs")
+                    elif 'Restaurant' in category or 'Food' in category:
+                        recommendations.append("Dining discounts or rewards")
+                    elif 'Retail' in category or 'Store' in category:
+                        recommendations.append("Retail loyalty program or BOGO offers")
+                    elif 'Electronics' in category:
+                        recommendations.append("Extended warranty offers or tech bundles")
+                    elif 'Online' in category:
+                        recommendations.append("Online purchase discounts or free shipping")
+                    elif 'Hotel' in category or 'Travel' in category:
+                        recommendations.append("Travel packages or hotel discounts")
+                    elif 'Health' in category:
+                        recommendations.append("Health and wellness product discounts")
+                
+                # Add general recommendations
+                if len(recommendations) < 3:
+                    general_recs = [
+                        "Personalized discounts at favorite merchants",
+                        "Category-specific cashback offers",
+                        "Bundle deals for frequently purchased items",
+                        "Limited-time promotional offers for new products"
+                    ]
+                    recommendations.extend(general_recs[:3 - len(recommendations)])
+                
+                # Display recommendations
+                for rec in recommendations[:3]:
+                    st.write(f"- {rec}")
+            else:
+                st.warning(f"No transaction data found for customer {selected_customer}")
+    
+    with tab2:
+        st.subheader("Transaction Insights")
+        st.write("Explore patterns and trends in the transaction data.")
+        
+        # Transaction timeline
+        st.write("**Transaction Timeline**")
+        
+        # Convert transaction_date to datetime and group by date
+        transactions_df['transaction_date'] = pd.to_datetime(transactions_df['transaction_date'])
+        daily_transactions = transactions_df.groupby(transactions_df['transaction_date'].dt.date).agg({
+            'transaction_id': 'count',
+            'transaction_amount': 'sum'
+        }).reset_index()
+        
+        # Create charts
+        st.line_chart(daily_transactions.set_index('transaction_date')['transaction_id'])
+        
+        st.write("**Daily Transaction Amount**")
+        st.line_chart(daily_transactions.set_index('transaction_date')['transaction_amount'])
+        
+        # Merchant Category Analysis
+        st.write("**Spending by Merchant Category**")
+        
+        # Group by merchant category
+        mcc_spending = sales_df.groupby('merchant_category_code').agg({
+            'transaction_amount': 'sum',
+            'transaction_id': 'count',
+            'customer_id': pd.Series.nunique
+        }).reset_index()
+        
+        # Add category names
+        mcc_spending['category_name'] = mcc_spending['merchant_category_code'].map(
+            lambda x: MCC_CODES.get(x, 'Unknown')
+        )
+        
+        # Sort and display
+        category_chart_data = mcc_spending.sort_values('transaction_amount', ascending=False).head(10)
+        st.bar_chart(category_chart_data.set_index('category_name')['transaction_amount'])
+        
+        # Weekend vs Weekday Analysis
+        st.write("**Weekend vs Weekday Spending**")
+        
+        # Add day of week
+        sales_df['day_of_week'] = sales_df['transaction_date'].dt.dayofweek
+        sales_df['is_weekend'] = sales_df['day_of_week'] >= 5
+        
+        # Group by weekend flag
+        weekend_data = sales_df.groupby('is_weekend').agg({
+            'transaction_amount': ['sum', 'mean'],
+            'transaction_id': 'count'
+        })
+        
+        # Flatten multi-level columns
+        weekend_data.columns = ['_'.join(col).strip() if isinstance(col, tuple) else col for col in weekend_data.columns]
+        
+        st.write("**Weekend vs Weekday Transaction Count**")
+        st.bar_chart(weekend_data['transaction_id_count'])
+        
+        st.write("**Weekend vs Weekday Total Spend**")
+        st.bar_chart(weekend_data['transaction_amount_sum'])
