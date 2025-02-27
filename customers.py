@@ -158,7 +158,7 @@ def load_customers_data(conn, filters=None):
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
     
-    return pd.read_sql_query(query, conn)
+    return pd.read_sql_query(query, conn, params=params)
 
 def get_customers_filter_options(conn):
     """Get available filter options"""
