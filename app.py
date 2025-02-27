@@ -8,6 +8,12 @@ import json
 import requests
 from tqdm import tqdm
 import os
+# Import customers module if it exists
+try:
+    import customers
+    customers_module_available = True
+except ImportError:
+    customers_module_available = False
 
 # Set page configuration
 st.set_page_config(
@@ -501,7 +507,7 @@ def main():
     st.markdown(f"### Found {len(df)} offers matching your criteria")
     
     # Create tabs for different views
-    tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📋 Data Explorer", "📈 Analytics"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📋 Data Explorer", "📈 Analytics", "👥 Customers"])
     
     # Tab 1: Dashboard
     with tab1:
@@ -689,6 +695,17 @@ def main():
                 st.info("No strong correlation between minimum purchase amount and discount percentage")
         else:
             st.info("Not enough data points to perform correlation analysis")
+
+        # Customers tab
+        with tab4:
+            if customers_module_available:
+                try:
+                    customers.show_customers_tab()
+                except Exception as e:
+                    st.error(f"Error displaying customers tab: {e}")
+                    st.exception(e)
+            else:
+                st.warning("Customers module not available. Please make sure customers.py is in your repository.")
 
 if __name__ == "__main__":
     main()
