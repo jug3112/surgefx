@@ -74,22 +74,36 @@ def show_transactions_tab():
         st.subheader("Customer Spending Analysis")
         
         # Select customer for analysis
-        customer_list = sorted([(id, name) for id, name in 
-                               zip(transactions_df['customer_id'].unique(), 
-                                   transactions_df['customer_name'].unique())],
-                              key=lambda x: x[1])
-        
-        selected_customer = st.selectbox(
-            "Select Customer",
-            options=[id for id, _ in customer_list],
-            format_func=lambda id: next((name for cid, name in customer_list if cid == id), id)
-        )
+        # Customer selector - handle case when customer_name is not available
+        if 'customer_name' in transactions_df.columns:
+            # Create list of (id, name) tuples
+            customer_list = []
+            for cid in transactions_df['customer_id'].unique():
+                name = transactions_df[transactions_df['customer_id'] == cid]['customer_name'].iloc[0]
+                customer_list.append((cid, name))
+            
+            # Sort by name
+            customer_list = sorted(customer_list, key=lambda x: x[1])
+            
+            selected_customer = st.selectbox(
+                "Select Customer",
+                options=[id for id, _ in customer_list],
+                format_func=lambda id: next((name for cid, name in customer_list if cid == id), id)
+            )
+        else:
+            # Just use IDs if names aren't available
+            customer_ids = sorted(transactions_df['customer_id'].unique())
+            selected_customer = st.selectbox(
+                "Select Customer",
+                options=customer_ids
+            )
         
         # Filter for selected customer
         customer_data = transactions_df[transactions_df['customer_id'] == selected_customer]
         
         if not customer_data.empty:
-            customer_name = customer_data['customer_name'].iloc[0]
+            # Get customer name if available, otherwise use ID
+            customer_name = customer_data['customer_name'].iloc[0] if 'customer_name' in customer_data.columns else selected_customer
             
             # Customer metrics
             st.subheader(f"Spending Profile: {customer_name}")
