@@ -16,6 +16,12 @@ try:
 except ImportError:
     customers_module_available = False
 
+# Import transaction analysis
+try:
+    from transactions_analysis import show_transactions_tab
+except:
+    show_transactions_tab = None
+
 # Set page configuration
 st.set_page_config(
     page_title="Merchant Offers Dashboard",
@@ -510,7 +516,7 @@ def main():
     st.markdown(f"### Found {len(df)} offers matching your criteria")
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📋 Data Explorer", "📈 Analytics", "👥 Customers"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Dashboard", "📋 Data Explorer", "📈 Analytics", "👥 Customers", "💳 Transactions"])
     
     # Tab 1: Dashboard
     with tab1:
@@ -710,7 +716,12 @@ def main():
             else:
                 st.warning("Customers module not available. Please make sure customers.py is in your repository.")
 
-
+        # Transactions tab
+        with tab5:
+            if show_transactions_tab:
+                show_transactions_tab()
+            else:
+                st.error("Transaction analysis module not found")
 
 
 if __name__ == "__main__":
